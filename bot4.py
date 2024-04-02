@@ -50,22 +50,6 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logging.info(f"User {user.id} ({user.username}): {update.message.text}")
 
 
-
-def check_state_change(update, context):
-    new_state = context.bot.current_state 
-    old_state = context.user_data.get('state')
-
-    if new_state != old_state: 
-        print(f"State changed from '{old_state}' to '{new_state}'")
-        context.user_data['state'] = new_state 
-        return True
-    else:
-        return False
-
-
-
-
-
 async def check_user_membership(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     if update.message.chat.type == "private":
         user_id = update.effective_user.id
@@ -234,69 +218,6 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await update.message.reply_text("An error occurred while processing the unban command.")
             print(f"Error in unban_command: {e}")
-
-async def process_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message.chat.type == "private": 
-        return IMAGE_PROCESSING  # Only process from private chats
-
-    if update.message.photo:
-        media, caption = await handle_photo(update)
-    elif update.message.document:
-        media, caption = await handle_document(update)
-    else:
-        reply_markup = InlineKeyboardMarkup(cancelbtn)
-        await update.message.reply_text('Please send an image or a supported document type.', reply_markup=reply_markup)
-        return IMAGE_PROCESSING
-
-    if media:
-        await send_media(context, media, caption)
-        reply_markup = InlineKeyboardMarkup(cancelbtn)
-        await update.message.reply_text('Image/document processed. Send another image/document.', reply_markup=reply_markup)
-    else:
-        reply_markup = InlineKeyboardMarkup(cancelbtn)
-        await update.message.reply_text('Failed to process the image/document. Try again.', reply_markup=reply_markup)
-
-    return IMAGE_PROCESSING  
-
-async def handle_photo(update: Update) -> (InputMediaPhoto):
-    photo = update.message.photo[-1] 
-    caption = generate_caption(update)
-    return InputMediaPhoto(photo.file_id, caption=caption), caption
-
-async def handle_document(update: Update) -> (InputMediaDocument):
-    # Add more specific checks for supported document types (if necessary)
-    document = update.message.document
-    caption = generate_caption(update) 
-    return InputMediaDocument(document.file_id, caption=caption), caption
-
-async def send_media(context: ContextTypes.DEFAULT_TYPE, media, caption):
-    print(f"Media type: {type(media)}")  # Check the type of media being passed 
-    print(f"Target Group ID: {TARGET_GROUP_ID}") 
-    print(f"Topic Message ID: {topic_message_id}")
-    # Assuming 'topic_message_id' is the message ID you want to reply to in the target group.
-    topic_message_id = 22  # Replace with the actual ID of the topic message
-    if isinstance(media, InputMediaPhoto):
-        await context.bot.send_photo(chat_id=TARGET_GROUP_ID, photo=media.media, caption=caption, reply_to_message_id=topic_message_id)
-    elif isinstance(media, InputMediaDocument):
-        await context.bot.send_document(chat_id=TARGET_GROUP_ID, document=media.media, caption=caption, reply_to_message_id=topic_message_id)
-
-
-async def generate_caption(update: Update) -> str:
-    user = update.effective_user
-    original_caption = update.message.caption if update.message.caption else "No caption"
-    return f"From: {user.first_name or 'No name'} @{user.username or 'No username'}\nCaption: {original_caption}"
-
-async def handle_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message.chat.type == "private":
-        await log_message(update, context)  # Ensure log_message is adapted for async execution
-        
-        reply_markup = InlineKeyboardMarkup(row1)
-        await update.message.reply_text('Please send an image or a file, and put the credits in the caption123.', reply_markup=reply_markup)
-
-async def handle_non_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message.chat.type == "private":
-        await log_message(update, context)  # Ensure log_message is adapted for async execution
-        await update.message.reply_text('Please test')
 
 def build_group_selection_markup(groups, selected_groups):
     group_buttons = [InlineKeyboardButton(f"{'✓' if str(group[0]) in selected_groups else ''} {group[1]}", callback_data=f'group_{group[0]}') for group in groups]
@@ -621,17 +542,13 @@ def main():
     application = Application.builder().token(TOKEN).build()
     # Define the ConversationHandler
     conversation_handler = ConversationHandler(
-        entry_points=[
-            MessageHandler(filters.ALL, check_state_change),
-            CommandHandler('start', start)
-            ],
+        entry_points=[CommandHandler('start', start)],
         states={
             DEFAULT_STATE: [
                 MessageHandler(filters.ALL & ~filters.COMMAND, handle_all,),
                 ],
             IMAGE_PROCESSING: [
-                MessageHandler(filters.PHOTO | filters.Document.IMAGE, process_media,),
-                MessageHandler(filters.ALL & ~(filters.COMMAND | filters.PHOTO | filters.Document.IMAGE), handle_non_media),
+
                                ],
             JOIN_PROCESSING:[
                 CallbackQueryHandler(button_click, pattern='joinbtn'),
