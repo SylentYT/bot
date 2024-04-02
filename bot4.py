@@ -50,6 +50,22 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logging.info(f"User {user.id} ({user.username}): {update.message.text}")
 
 
+
+def check_state_change(update, context):
+    new_state = context.bot.current_state 
+    old_state = context.user_data.get('state')
+
+    if new_state != old_state: 
+        print(f"State changed from '{old_state}' to '{new_state}'")
+        context.user_data['state'] = new_state 
+        return True
+    else:
+        return False
+
+
+
+
+
 async def check_user_membership(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     if update.message.chat.type == "private":
         user_id = update.effective_user.id
@@ -597,28 +613,18 @@ def db_initialize():
                 print("MySQL connection is closed")
     else:
         print("Failed to connect to the database.")
-    
-class LoggingConversationHandler(ConversationHandler):
-    def check_update(self, update):
-        if update.message or update.edited_message:
-            result = super().check_update(update)  # Call the original check_update
 
-            # Check for state change
-            new_state = result[-1] if result else None
-            old_state = self.conversations.get(update.effective_chat.id, {}).get('state')
-            if new_state != old_state: 
-                print(f"State changed from '{old_state}' to '{new_state}'")
-                self.conversations[update.effective_chat.id]['state'] = new_state  # Update stored state
-
-            return result
 
 def main():
 
     # Initialize Application with your bot's token
     application = Application.builder().token(TOKEN).build()
     # Define the ConversationHandler
-    conversation_handler = LoggingConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+    conversation_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.ALL, check_state_change),
+            CommandHandler('start', start)
+            ],
         states={
             DEFAULT_STATE: [
                 MessageHandler(filters.ALL & ~filters.COMMAND, handle_all,),
